@@ -27,7 +27,7 @@ jobs:
           java-version: 17
 
       - name: Run tests
-        run: mvn test
+        run: mvn -B test
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -75,6 +75,6 @@ jobs:
 
       - name: Smoke test
         run: |
-          sleep 30
+          sleep 40
           ALB=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?contains(LoadBalancerName,'hotel-booking')].DNSName" --output text)
           curl -f http://$ALB/actuator/health
