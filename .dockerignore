@@ -1,0 +1,10 @@
+target/
+uploads/
+.git/
+.idea/
+.vscode/
+HELP.md
+*.iml
+*.log
+.env
+*.postman_collection.json
