@@ -20,14 +20,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      # FIX: Java 21 (matches your Maven compiler setting)
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
+          cache: maven
 
       - name: Run tests
-        run: mvn -B test
+        run: mvn -B clean test
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -51,13 +53,13 @@ jobs:
           docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
           docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:latest
 
-      - name: Download task definition
+      - name: Download current task definition
         run: |
           aws ecs describe-task-definition \
             --task-definition hotel-booking-task \
             --query taskDefinition > task-definition.json
 
-      - name: Render task definition
+      - name: Render new task definition
         id: render-task
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
@@ -77,4 +79,5 @@ jobs:
         run: |
           sleep 40
           ALB=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?contains(LoadBalancerName,'hotel-booking')].DNSName" --output text)
+          echo "ALB = $ALB"
           curl -f http://$ALB/actuator/health
