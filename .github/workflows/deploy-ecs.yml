@@ -21,7 +21,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Setup Java (IMPORTANT FIX for your Maven error)
+      # 2. Setup Java 21 (fixes Maven issue)
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -30,14 +30,15 @@ jobs:
 
       # 3. Run tests
       - name: Run tests
-        run: mvn clean test
+        run: mvn -B clean test
 
-      # 4. Configure AWS credentials (FIX YOUR ERROR HERE)
+      # 4. Configure AWS credentials (FIXED: includes session token)
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
       # 5. Login to Amazon ECR
@@ -45,7 +46,7 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 6. Build, tag, and push Docker image
+      # 6. Build & push Docker image
       - name: Build, tag, and push image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -54,16 +55,23 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # 7. Render new ECS task definition
+      # 7. Download current ECS task definition (FIXED - no missing file)
+      - name: Download task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition hotel-booking-task \
+            --query taskDefinition > task-def.json
+
+      # 8. Render new task definition with new image
       - name: Render ECS task definition
         id: render-task
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: ecs-task-def.json
+          task-definition: task-def.json
           container-name: ${{ env.CONTAINER_NAME }}
           image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
 
-      # 8. Deploy to ECS
+      # 9. Deploy to ECS
       - name: Deploy to ECS service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
@@ -72,8 +80,9 @@ jobs:
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
 
-      # 9. Smoke test (IMPORTANT FINAL CHECK)
+      # 10. Smoke test (ALB check)
       - name: Smoke test ALB health
         run: |
-          echo "Checking health endpoint..."
+          echo "Waiting for service to stabilize..."
+          sleep 60
           curl -f ${{ secrets.ALB_URL }}/actuator/health
