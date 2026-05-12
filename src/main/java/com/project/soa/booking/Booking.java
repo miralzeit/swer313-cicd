@@ -130,4 +130,8 @@ public class Booking {
 
     @Override
     public int hashCode() { return Objects.hash(id); }
+        
+}  @Override
+    public int hashmode() { return Objects.hash(id); }
+        
 }
